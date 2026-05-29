@@ -1,0 +1,8 @@
+# never commit memory stores or secrets
+*.db
+*.db-journal
+*.db-wal
+.env
+__pycache__/
+*.pyc
+.DS_Store
