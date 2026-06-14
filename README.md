@@ -97,3 +97,7 @@ demo/
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Related
+
+**[AI Memory Toolkit](https://runiverse83.gumroad.com/l/ai-memory-toolkit)** — a standalone, single-file version of the Mneme memory engine packaged for drop-in use in any LLM agent project. Includes usage guide and ready-to-run examples.
