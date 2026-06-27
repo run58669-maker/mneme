@@ -2,3 +2,5 @@
 # Core engine (memory_core.py) needs only the Python stdlib (sqlite3, math, json).
 # The Qwen-backed agent needs the OpenAI SDK (Model Studio is OpenAI-compatible).
 openai>=1.0.0
+fastapi>=0.110.0
+uvicorn>=0.29.0
