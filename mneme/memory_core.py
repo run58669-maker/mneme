@@ -177,13 +177,21 @@ class Memory:
                 out.append(n)
         return out
 
-    def search(self, query: str, k: int = 8) -> list[dict]:
-        """Find a few relevant seeds (semantic if an embedder is set, else
-        char-bigram), then spread activation across the graph from them."""
+    def search(self, query: str, k: int = 8, recency_boost: float = 0.3) -> list[dict]:
+        """Find relevant seeds, spread activation, then boost recent nodes."""
         seeds = self._semantic_seeds(query) if self.embedder else []
         if not seeds:
             seeds = self._bigram_seeds(query)
-        return self.recall(seeds, k=k) if seeds else []
+        if not seeds:
+            return []
+        results = self.recall(seeds, k=k * 2)
+        if recency_boost > 0:
+            now = _parse(_now())
+            for r in results:
+                age_days = (now - _parse(r["created_at"])).total_seconds() / 86400.0
+                r["_score"] = r.get("_score", 0) + recency_boost * math.exp(-age_days / 7.0)
+            results.sort(key=lambda h: -h.get("_score", 0))
+        return results[:k]
 
     def _semantic_seeds(self, query: str, top: int = 3, min_sim: float = 0.2) -> list[int]:
         try:

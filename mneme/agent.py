@@ -41,34 +41,40 @@ SLEEP_PROMPT = (
 
 class MemoryAgent:
     def __init__(self, db_path: str = "mneme.db", qwen: QwenClient | None = None,
-                 recall_k: int = 6, semantic: bool = True):
+                 recall_k: int = 6, semantic: bool = True, history_turns: int = 6):
         self.qwen = qwen or QwenClient()
-        # semantic recall via Qwen embeddings; falls back to bigram if disabled
         embedder = self.qwen.embed_one if semantic else None
         self.mem = Memory(db_path, embedder=embedder)
         self.recall_k = recall_k
+        self.history_turns = history_turns
+        self._history: list[dict] = []  # sliding window of recent turns
 
     def _context(self, query: str) -> str:
         hits = self.mem.search(query, k=self.recall_k)
         if not hits:
             return "(no memories yet)"
-        # context-budgeted: only the top-activated memories, gists first
         hits.sort(key=lambda h: (h["kind"] != "gist", -h.get("_score", 0)))
         return "\n".join(f"- {h['content']}" for h in hits)
 
     def chat(self, user_msg: str, temperature: float = 0.7) -> str:
         memories = self._context(user_msg)
         system = SYSTEM_BASE.format(memories=memories)
-        reply = self.qwen.chat(
-            [{"role": "system", "content": system},
-             {"role": "user", "content": user_msg}],
-            temperature=temperature,
-        )
-        # accumulate experience
+        messages = [{"role": "system", "content": system}]
+        messages.extend(self._history)
+        messages.append({"role": "user", "content": user_msg})
+        reply = self.qwen.chat(messages, temperature=temperature)
+        self._history.append({"role": "user", "content": user_msg})
+        self._history.append({"role": "assistant", "content": reply})
+        if len(self._history) > self.history_turns * 2:
+            self._history = self._history[-self.history_turns * 2:]
         self.mem.remember(f"User said: {user_msg}", kind="episodic")
         self.mem.remember(f"Assistant replied: {reply}", kind="episodic",
                           metadata={"role": "assistant"})
         return reply
+
+    def new_session(self):
+        """Clear conversation history (simulates a new session)."""
+        self._history.clear()
 
     def sleep(self, since_hours: float = 24.0) -> dict:
         """Consolidate recent episodic fragments into a durable gist."""
